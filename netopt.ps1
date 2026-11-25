@@ -234,10 +234,11 @@ function Invoke-Optimize {
     Write-Log "Tat power saving tren NIC..."
     foreach ($a in $adapters) {
         try {
-            Set-NetAdapterPowerManagement -Name $a.Name -AllowComputerToTurnOffDevice Disabled -ErrorAction Stop
+            Get-NetAdapterPowerManagement -Name $a.Name -ErrorAction Stop | Out-Null
+            Set-NetAdapterPowerManagement -Name $a.Name -SelectiveSuspend Disabled -WakeOnMagicPacket Disabled -WakeOnPattern Disabled -ErrorAction Stop
             Write-Log ("  " + $a.Name + ": OK")
         } catch {
-            Write-Log ("  " + $a.Name + ": " + $_.Exception.Message)
+            Write-Log ("  " + $a.Name + ": skip (not supported)")
         }
     }
 
@@ -246,7 +247,13 @@ function Invoke-Optimize {
     $wifiAdapters = Get-NetAdapter | Where-Object { $_.InterfaceDescription -match 'Wireless|Wi-Fi|WLAN|802.11' }
     foreach ($wa in $wifiAdapters) {
         # power mgmt
-        try { Set-NetAdapterPowerManagement -Name $wa.Name -AllowComputerToTurnOffDevice Disabled -ErrorAction Stop; Write-Log ("  " + $wa.Name + " power mgmt: OK") } catch {}
+        try {
+            Get-NetAdapterPowerManagement -Name $wa.Name -ErrorAction Stop | Out-Null
+            Set-NetAdapterPowerManagement -Name $wa.Name -SelectiveSuspend Disabled -WakeOnMagicPacket Disabled -WakeOnPattern Disabled -ErrorAction Stop
+            Write-Log ("  " + $wa.Name + " power mgmt: OK")
+        } catch {
+            Write-Log ("  " + $wa.Name + " power mgmt: skip (not supported)")
+        }
         # Advanced properties
         $props = Get-NetAdapterAdvancedProperty -Name $wa.Name -ErrorAction SilentlyContinue
         # Roaming Aggressiveness -> Medium (3) or Highest? set to 3.0
