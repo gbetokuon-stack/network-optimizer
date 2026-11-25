@@ -4,7 +4,7 @@ Tool PowerShell toi uu mang cho Windows, giam lag khi choi game / stream / lam v
 
 ## Tinh nang
 
-- **Scan** (`-Scan`): quet adapter, IP/DNS, ping, tien trinh ngon bang thong, dich vu nen, TCP global.
+- **Scan** (`-Scan`): quet adapter, IP/DNS, ping, tien trinh ngon bang thong, dich vu nen, TCP global, **thong tin Wi-Fi (SSID, tin hieu, kenh)**, **driver Wi-Fi (kiem tra update)**.
 - **Optimize** (`-Optimize`): ap dung cac toi uu:
   - Tat Nagle (TcpAckFrequency=1, TCPNoDelay=1) giam do tre goi tin nho.
   - Loai 20% bang thong danh rieng cho QoS.
@@ -15,6 +15,7 @@ Tool PowerShell toi uu mang cho Windows, giam lag khi choi game / stream / lam v
   - Ket thuc tien trinh nen nang (Microsoft PC Manager, Omen Command Center...).
   - Xoa auto-start nang (Discord, Riot Client, Edge auto-launch, Cloudflare WARP).
   - Tat power saving tren NIC.
+  - **Toi uu Wi-Fi: power saving off, roaming aggressiveness, uu tien 5GHz.**
   - Flush DNS, don temp.
   - (Tuy chon) Reset Winsock + TCP/IP voi `-ResetStack`.
 - **Restore** (`-Restore`): khoi phuc cai dat goc.

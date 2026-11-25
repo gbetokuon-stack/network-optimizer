@@ -107,6 +107,36 @@ function Invoke-Scan {
         if ($svc) { Write-Host ("  {0}: {1} ({2})" -f $svc.Name, $svc.Status, $svc.StartType) }
     }
 
+    Write-Host "=== Wi-Fi (neu dang dung) ===" -ForegroundColor Cyan
+    $wifiIfaces = netsh wlan show interfaces 2>&1
+    if ($wifiIfaces -match 'SSID') {
+        $wifiIfaces | ForEach-Object { if ($_ -match '^\s+\S') { Write-Host ("  " + $_.Trim()) } }
+        $sigLine = $wifiIfaces | Select-String -Pattern 'Signal\s*:\s*(\d+)%'
+        if ($sigLine) {
+            $sig = [int]$sigLine.Matches[0].Groups[1].Value
+            Write-Host ("  Signal: {0}%" -f $sig) -ForegroundColor $(if ($sig -lt 70) { 'Yellow' } else { 'Green' })
+            if ($sig -lt 70) { Write-Host "  -> Tin hieu yeu: di chuyen gan router / doi kenh 5GHz." -ForegroundColor Yellow }
+        }
+    } else {
+        Write-Host "  Khong ket noi Wi-Fi (dang dung LAN hoac Wi-Fi tat)."
+    }
+
+    Write-Host ""
+    Write-Host "=== Driver Wi-Fi (kiem tra update) ===" -ForegroundColor Cyan
+    $wifiAdapters = Get-NetAdapter | Where-Object { $_.InterfaceDescription -match 'Wireless|Wi-Fi|WLAN|802.11' }
+    foreach ($wa in $wifiAdapters) {
+        $drv = $wa | Get-NetAdapterDriver -ErrorAction SilentlyContinue
+        if ($drv) {
+            Write-Host ("  {0}: driver {1} ({2})" -f $wa.Name, $drv.DriverVersion, $drv.DriverDate)
+        } else {
+            Write-Host ("  {0}: khong lay duoc thong tin driver" -f $wa.Name)
+        }
+        if ($wa.Status -eq 'Up') {
+            Write-Host "  -> De update driver: Device Manager > Network adapters > Update driver, hoac Windows Update." -ForegroundColor DarkGray
+        }
+    }
+
+    Write-Host ""
     Write-Host "=== TCP global ===" -ForegroundColor Cyan
     netsh int tcp show global | Select-String -Pattern "State|Level|Provider|Capability|Timestamps|Retransmissions|RTO|Open" | ForEach-Object { Write-Host ("  " + $_.Line.Trim()) }
 
@@ -211,6 +241,26 @@ function Invoke-Optimize {
         }
     }
 
+    # 9b. Wi-Fi optimization (roaming aggressiveness, preferred band)
+    Write-Log "Toi uu Wi-Fi adapter..."
+    $wifiAdapters = Get-NetAdapter | Where-Object { $_.InterfaceDescription -match 'Wireless|Wi-Fi|WLAN|802.11' }
+    foreach ($wa in $wifiAdapters) {
+        # power mgmt
+        try { Set-NetAdapterPowerManagement -Name $wa.Name -AllowComputerToTurnOffDevice Disabled -ErrorAction Stop; Write-Log ("  " + $wa.Name + " power mgmt: OK") } catch {}
+        # Advanced properties
+        $props = Get-NetAdapterAdvancedProperty -Name $wa.Name -ErrorAction SilentlyContinue
+        # Roaming Aggressiveness -> Medium (3) or Highest? set to 3.0
+        $roam = $props | Where-Object { $_.DisplayName -match 'Roaming Aggressiveness' }
+        if ($roam) {
+            try { Set-NetAdapterAdvancedProperty -Name $wa.Name -DisplayName $roam.DisplayName -DisplayValue '3. Medium' -ErrorAction Stop; Write-Log ("  " + $wa.Name + " roaming: Medium") } catch { Write-Log ("  " + $wa.Name + " roaming: " + $_.Exception.Message) }
+        }
+        # Preferred Band -> 5GHz
+        $band = $props | Where-Object { $_.DisplayName -match 'Preferred Band' }
+        if ($band) {
+            try { Set-NetAdapterAdvancedProperty -Name $wa.Name -DisplayName $band.DisplayName -DisplayValue '2. 5GHz' -ErrorAction Stop; Write-Log ("  " + $wa.Name + " preferred band: 5GHz") } catch { Write-Log ("  " + $wa.Name + " band: " + $_.Exception.Message) }
+        }
+    }
+    if (-not $wifiAdapters) { Write-Log "  Khong co Wi-Fi adapter." }
     # 10. Flush DNS
     Write-Log "Flush DNS..."
     ipconfig /flushdns 2>&1 | Out-Null
