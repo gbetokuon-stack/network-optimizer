@@ -19,6 +19,9 @@ Tool PowerShell toi uu mang cho Windows, giam lag khi choi game / stream / lam v
   - Flush DNS, don temp.
   - (Tuy chon) Reset Winsock + TCP/IP voi `-ResetStack`.
 - **Restore** (`-Restore`): khoi phuc cai dat goc.
+- **Speed test** (`-SpeedTest`): ping/jitter + download speed 1MB.
+- **Update drivers** (`-UpdateDrivers`): quet PnP + kich hoat Windows Update scan, ho tro PSWindowsUpdate.
+- Chay nhanh bang `netopt.bat` (menu).
 
 ## Cach dung
 

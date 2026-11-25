@@ -34,7 +34,9 @@ param(
     [switch]$Optimize,
     [switch]$Restore,
     [switch]$ResetStack,
-    [switch]$SetDns = $true
+    [switch]$SetDns = $true,
+    [switch]$SpeedTest,
+    [switch]$UpdateDrivers
 )
 
 # ---------- Elevation ----------
@@ -328,11 +330,81 @@ function Invoke-Restore {
     Write-Log "Restore hoan tat. (Startup entries can khoi phuc thu cong tu backup/)"
 }
 
+# ---------- Speed test ----------
+function Invoke-SpeedTest {
+    Write-Log "===== SPEED TEST ====="
+    Write-Host ""
+    Write-Host "=== Ping / Jitter ===" -ForegroundColor Cyan
+    $samples = @()
+    for ($i=0; $i -lt 20; $i++) {
+        $r = Test-Connection -ComputerName 'google.com' -Count 1 -ErrorAction SilentlyContinue
+        if ($r) { $samples += $r.ResponseTime }
+        Start-Sleep -Milliseconds 100
+    }
+    if ($samples.Count -gt 0) {
+        $avg = [math]::Round(($samples | Measure-Object -Average).Average,1)
+        $min = ($samples | Measure-Object -Minimum).Minimum
+        $max = ($samples | Measure-Object -Maximum).Maximum
+        $jitter = [math]::Round(($samples | ForEach-Object { [math]::Abs($_ - $avg) } | Measure-Object -Average).Average,1)
+        Write-Host ("  avg {0}ms, min {1}ms, max {2}ms, jitter {3}ms" -f $avg,$min,$max,$jitter)
+    }
+
+    Write-Host ""
+    Write-Host "=== Download speed (1MB) ===" -ForegroundColor Cyan
+    $url = 'http://speedtest.tele2.net/1MB.zip'
+    $tmp = Join-Path $env:TEMP 'netopt_speedtest.bin'
+    try {
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
+        Invoke-WebRequest -Uri $url -OutFile $tmp -UseBasicParsing -ErrorAction Stop
+        $sw.Stop()
+        $bytes = (Get-Item $tmp).Length
+        $mbps = [math]::Round(($bytes * 8) / ($sw.Elapsed.TotalSeconds * 1e6), 2)
+        Write-Host ("  {0} Mbps ({1} bytes in {2:N2}s)" -f $mbps, $bytes, $sw.Elapsed.TotalSeconds) -ForegroundColor Green
+    } catch {
+        Write-Host ("  Loi: " + $_.Exception.Message) -ForegroundColor Red
+    } finally {
+        Remove-Item $tmp -Force -ErrorAction SilentlyContinue
+    }
+    Write-Log "Speed test hoan tat."
+}
+
+# ---------- Driver update ----------
+function Invoke-DriverUpdate {
+    Write-Log "===== DRIVER UPDATE ====="
+    Write-Host "Quet thiet bi PnP..." -ForegroundColor Cyan
+    try { pnputil /scan-devices 2>&1 | Out-Null; Write-Host "  pnputil scan OK" } catch { Write-Host "  pnputil loi" }
+
+    Write-Host "Kich hoat Windows Update scan (driver)..." -ForegroundColor Cyan
+    $uso = "$env:SystemRoot\System32\usoclient.exe"
+    if (Test-Path $uso) {
+        try { Start-Process $uso -ArgumentList 'StartScan' -Wait -ErrorAction Stop; Write-Host "  StartScan OK" } catch { Write-Host "  StartScan loi: $($_.Exception.Message)" }
+        Start-Sleep -Seconds 2
+        try { Start-Process $uso -ArgumentList 'StartDownload' -ErrorAction SilentlyContinue } catch {}
+    } else {
+        Write-Host "  usoclient khong ton tai"
+    }
+
+    if (Get-Module -ListAvailable -Name PSWindowsUpdate) {
+        Write-Host "Su dung PSWindowsUpdate..." -ForegroundColor Cyan
+        Import-Module PSWindowsUpdate -ErrorAction SilentlyContinue
+        try { Get-WindowsUpdate -AcceptAll -Install -IgnoreReboot -ErrorAction Stop } catch { Write-Host "  $_" }
+    } else {
+        Write-Host "Goi y: cai module PSWindowsUpdate de tu dong cai driver:" -ForegroundColor Yellow
+        Write-Host "  Install-Module PSWindowsUpdate -Scope CurrentUser" -ForegroundColor Yellow
+        Write-Host "Hoac dung Device Manager / Windows Update thu cong." -ForegroundColor Yellow
+    }
+    Write-Log "Driver update hoan tat."
+}
+
 # ---------- Dispatch ----------
 if ($Restore) {
     Invoke-Restore
 } elseif ($Optimize) {
     Invoke-Optimize
+} elseif ($SpeedTest) {
+    Invoke-SpeedTest
+} elseif ($UpdateDrivers) {
+    Invoke-DriverUpdate
 } else {
     Invoke-Scan
 }
